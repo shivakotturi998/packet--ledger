@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocket Ledger – Expense Tracker</title>
+<meta name="description" content="Pocket Ledger – simple offline expense tracker. Track salary, spending and balance.">
+<meta name="theme-color" content="#2F3FD0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pocket Ledger">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Setup screen: shown until starting balance + salary are saved -->
+<section id="setup" class="setup hidden">
+  <div class="setup-card">
+    <h1>Pocket Ledger</h1>
+    <p class="lead">Tell us where you're starting from. You can change these later.</p>
+    <label>Starting balance (₹)
+      <input id="startInput" type="number" min="0" step="any" placeholder="e.g. 15000">
+    </label>
+    <label>Monthly salary (₹)
+      <input id="salaryInput" type="number" min="0" step="any" placeholder="e.g. 40000">
+    </label>
+    <button id="startBtn" class="btn primary">Start tracking</button>
+    <p id="setupErr" class="err"></p>
+    <div class="or"><span>or</span></div>
+    <button id="importBtn2" class="btn outline">Restore from a CSV backup</button>
+  </div>
+</section>
+
+<main id="app" class="app hidden">
+  <header class="top">
+    <h1>Pocket Ledger</h1>
+    <div class="top-actions">
+      <button id="exportBtn" class="btn ghost">Export CSV</button>
+      <button id="importBtn" class="btn ghost">Import CSV</button>
+      <button id="editBtn" class="btn ghost">Edit setup</button>
+      <button id="resetBtn" class="btn ghost danger">Reset all</button>
+    </div>
+  </header>
+
+  <section class="balance">
+    <div class="balance-main">
+      <span class="label">Balance</span>
+      <strong id="balance">₹0</strong>
+      <span id="balanceNote" class="note"></span>
+    </div>
+    <div class="balance-side">
+      <div><span class="label">Starting</span><b id="sStart">₹0</b></div>
+      <div><span class="label">Salary received</span><b id="sSalary">₹0</b></div>
+      <div><span class="label">Spent</span><b id="sSpent">₹0</b></div>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+    <button id="salaryBtn" class="btn light">+ Add this month's salary</button>
+  </section>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Add an expense</h2>
+      <form id="expForm" autocomplete="off">
+        <div class="cats" id="catPicker" role="radiogroup" aria-label="Category"></div>
+        <label>Amount (₹)
+          <input id="amount" type="number" min="0.01" step="any" required placeholder="0">
+        </label>
+        <label>Note <span class="opt">(optional)</span>
+          <input id="note" type="text" maxlength="60" placeholder="e.g. Dinner at Paradise">
+        </label>
+        <label>Date
+          <input id="date" type="date" required>
+        </label>
+        <button class="btn primary" type="submit">Add expense</button>
+        <p id="formErr" class="err"></p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Where it went</h2>
+      <div id="breakdown" class="breakdown"></div>
+    </section>
+
+    <section class="panel wide">
+      <div class="list-head">
+        <h2>Transactions</h2>
+        <select id="filter" aria-label="Filter by category"></select>
+      </div>
+      <ul id="list" class="list"></ul>
+    </section>
+  </div>
+</main>
+
+<input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+<div id="offlineBadge" class="offline-badge" hidden>Offline — changes saved on this device</div>
+<div id="toast" class="toast" role="status"></div>
+<script src="script.js"></script>
+<script>
+// Register service worker for offline + installable PWA (safe to ignore on file:// or old browsers)
+if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+  // Auto-activate updated SW so new deploys apply without 2nd reload.
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+  }
+}
+// Offline badge — works on PWA + hosted + Capacitor.
+(function () {
+  const badge = document.getElementById('offlineBadge');
+  if (!badge) return;
+  const sync = () => { badge.hidden = navigator.onLine; };
+  window.addEventListener('online', sync);
+  window.addEventListener('offline', sync);
+  sync();
+})();
+</script>
+</body>
+</html>

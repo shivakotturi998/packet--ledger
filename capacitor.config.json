@@ -1,0 +1,8 @@
+{
+  "appId": "com.pocketledger.app",
+  "appName": "Pocket Ledger",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  }
+}
