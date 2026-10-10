@@ -18,7 +18,7 @@ function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(
 function uid(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
 function todayStr(){ try { return new Date().toISOString().slice(0,10); } catch(e){ return ''; } }
 var CAT_MAP = {food:'food', grocery:'groceries', fuel:'transport', entertainment:'entertainment', wants:'wants', household:'household', bills:'bills', other:'others'};
-function blankState(){ return {start:0, incomes:[], expenses:[], notes:[], budgets:{}, theme:'light'}; }
+function blankState(){ return {start:0, incomes:[], expenses:[], notes:[], budgets:{}, theme:'light', notify:{enabled:true, daily:true, time:'21:00', budget:true, balance:true, lowBalance:500, recurring:true, fired:{}}}; }
 function normalize(s){
   if(!s || typeof s!=='object') return blankState();
   var n = blankState();
@@ -43,6 +43,17 @@ function normalize(s){
   });
   if(s.budgets && typeof s.budgets==='object'){
     Object.keys(s.budgets).forEach(function(k){ if(valid[k] && Number(s.budgets[k])>0) n.budgets[k]=Number(s.budgets[k]); });
+  }
+  if(s.notify && typeof s.notify==='object'){
+    var dn = n.notify;
+    dn.enabled = s.notify.enabled !== false;
+    dn.daily = s.notify.daily !== false;
+    dn.budget = s.notify.budget !== false;
+    dn.balance = s.notify.balance !== false;
+    dn.recurring = s.notify.recurring !== false;
+    if(typeof s.notify.time==='string' && /^\d{2}:\d{2}$/.test(s.notify.time)) dn.time = s.notify.time;
+    if(Number(s.notify.lowBalance) >= 0) dn.lowBalance = Number(s.notify.lowBalance);
+    if(s.notify.fired && typeof s.notify.fired==='object') dn.fired = s.notify.fired;
   }
   if(Array.isArray(s.recurring)){}
   return n;
@@ -70,6 +81,9 @@ function loadState(){
 }
 var state = loadState();
 var editingNoteId = null;
+/* Collapsible UI state — keeps home short */
+var showAllTx = false, showAllNotes = false, showAllRec = false, showAllBudgets = false;
+var TX_LIMIT = 5, NOTES_LIMIT = 3, REC_LIMIT = 3, BUDGET_LIMIT = 3;
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('Storage full or blocked - export a CSV backup'); } }
 function toast(msg){ var t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(function(){ t.classList.remove('show'); }, 2200); }
 function applyTheme(){ document.body.classList.toggle('dark', state && state.theme==='dark'); var b=$('themeBtn'); if(b) b.textContent = (state && state.theme==='dark') ? '☀️ Light' : '🌙 Dark'; try{ document.querySelector('meta[name=theme-color]').setAttribute('content', state&&state.theme==='dark' ? '#11141C' : '#2F3FD0'); }catch(e){} }
@@ -117,7 +131,7 @@ $('expForm').addEventListener('submit', function(e){
   $('formErr').textContent = '';
   state.expenses.unshift({id:uid(), cat:c.id, sub:sub, amount:amount, note:$('note').value.trim(), date:dateVal, recurring:$('expRecurring').checked});
   state.expenses.sort(function(a,b){ return b.date.localeCompare(a.date) || b.id - a.id; });
-  save(); $('amount').value=''; $('note').value=''; $('expRecurring').checked=false; render(); toast('Expense added');
+  save(); $('amount').value=''; $('note').value=''; $('expRecurring').checked=false; render(); toast('Expense added'); checkAlerts('expense', c.id);
 });
 $('incForm').addEventListener('submit', function(e){
   e.preventDefault();
@@ -128,7 +142,7 @@ $('incForm').addEventListener('submit', function(e){
   $('incErr').textContent = '';
   state.incomes.unshift({id:uid(), amount:amount, source:$('incSource').value.trim()||'Income', note:$('incNote').value.trim(), date:dateVal, recurring:$('incRecurring').checked});
   state.incomes.sort(function(a,b){ return b.date.localeCompare(a.date) || b.id - a.id; });
-  save(); $('incAmount').value=''; $('incSource').value=''; $('incNote').value=''; $('incRecurring').checked=false; render(); toast('Income added');
+  save(); $('incAmount').value=''; $('incSource').value=''; $('incNote').value=''; $('incRecurring').checked=false; render(); toast('Income added'); checkAlerts('income');
 });
 function removeExpense(id){ state.expenses = state.expenses.filter(function(x){ return x.id!==id; }); save(); render(); toast('Expense deleted'); }
 function removeIncome(id){ state.incomes = state.incomes.filter(function(x){ return x.id!==id; }); save(); render(); toast('Income deleted'); }
@@ -247,21 +261,27 @@ $('budgetForm').addEventListener('submit', function(e){
   var cat = $('budgetCat').value, amt = parseFloat($('budgetAmt').value);
   if(isNaN(amt) || amt<=0){ $('budgetErr').textContent='Enter an amount above 0.'; return; }
   $('budgetErr').textContent='';
-  state.budgets[cat]=amt; save(); $('budgetAmt').value=''; render(); toast('Budget saved');
+  state.budgets[cat]=amt; save(); $('budgetAmt').value=''; render(); toast('Budget saved'); checkAlerts('budget', cat);
 });
 function removeBudget(cat){ delete state.budgets[cat]; save(); render(); }
 window.removeBudget = removeBudget;
 function renderBudgets(monthSpent){
   var box = $('budgets');
   var keys = Object.keys(state.budgets||{});
-  if(!keys.length){ box.innerHTML = '<p class="empty">No budgets yet. Set one above.</p>'; return; }
-  box.innerHTML = keys.map(function(k){
+  if(!keys.length){ box.innerHTML = '<p class="empty">No budgets yet. Set one above.</p>'; var bt0=$('budgetToggle'); if(bt0) bt0.classList.add('hidden'); return; }
+  var vis = showAllBudgets ? keys : keys.slice(0, BUDGET_LIMIT);
+  box.innerHTML = vis.map(function(k){
     var c = catOf(k), limit = state.budgets[k], spent = monthSpent[k]||0;
     var pct = limit>0 ? Math.min(100, spent/limit*100) : 0;
     var cls = spent>limit ? 'budget over' : (spent>=limit*0.8 ? 'budget warn' : 'budget');
     var msg = spent>limit ? 'Over budget' : (spent>=limit*0.8 ? 'Near limit' : 'On track');
     return '<div class="'+cls+'"><div class="b-top"><span>'+c.icon+' '+c.label+'</span><button class="mini danger" onclick="removeBudget(\''+k+'\')">Remove</button></div><div>'+inr(spent)+' of '+inr(limit)+' ('+pct.toFixed(0)+'%) - '+msg+'</div><div class="bar" style="--c:'+c.color+'"><i style="width:'+pct+'%"></i></div></div>';
   }).join('');
+  var bt = $('budgetToggle');
+  if(bt){
+    if(keys.length > BUDGET_LIMIT){ bt.classList.remove('hidden'); bt.textContent = showAllBudgets ? 'Show less' : 'Show all ('+keys.length+')'; }
+    else bt.classList.add('hidden');
+  }
 }
 $('noteForm').addEventListener('submit', function(e){
   e.preventDefault();
@@ -292,6 +312,10 @@ function monthOptions(){
 function render(){
   if(!state) return showSetup(false);
   applyTheme();
+  bindNotifUIOnce();
+  refreshNotifUI();
+  scheduleDailyReminder();
+  checkRecurring(true);
   $('setup').classList.add('hidden'); $('app').classList.remove('hidden');
   var income = state.incomes.reduce(function(s,x){ return s+x.amount; }, 0);
   var spent = state.expenses.reduce(function(s,x){ return s+x.amount; }, 0);
@@ -319,6 +343,11 @@ function render(){
   renderList(monthSpentByCat);
 }
 /* Main render part B: list + recurring + notes + init */
+function setToggle(id, total, limit, expanded){
+  var b = $(id); if(!b) return;
+  if(total > limit){ b.classList.remove('hidden'); b.textContent = expanded ? 'Show less' : 'Show all ('+total+')'; }
+  else b.classList.add('hidden');
+}
 function renderList(monthSpentByCat){
   var months = monthOptions();
   var curSel = $('monthFilter').value || 'all';
@@ -337,29 +366,250 @@ function renderList(monthSpentByCat){
     if(q && (String(x.title||'')+' '+String(x.sub||'')).toLowerCase().indexOf(q)<0) return false;
     return true;
   });
-  $('list').innerHTML = shown.length ? shown.map(function(x){
+  var tc = $('txCount'); if(tc) tc.textContent = shown.length ? '('+shown.length+')' : '';
+  var visTx = showAllTx ? shown : shown.slice(0, TX_LIMIT);
+  $('list').innerHTML = shown.length ? visTx.map(function(x){
     if(x.kind==='income') return '<li class="item"><div class="ico">💰</div><div class="meta"><b>+'+esc(x.title)+'</b><small>Income · '+fmtDate(x.date)+(x.sub?' · '+esc(x.sub):'')+'</small></div><span class="amt plus">+'+inr(x.amount)+'</span><button class="del" onclick="removeIncome('+x.id+')">×</button></li>';
     return '<li class="item" style="--c:'+x.color+'"><div class="ico">'+x.icon+'</div><div class="meta"><b>'+esc(x.title)+'</b><small>'+esc(x.sub)+' · '+fmtDate(x.date)+'</small></div><span class="amt">−'+inr(x.amount)+'</span><button class="del" onclick="removeExpense('+x.id+')">×</button></li>';
   }).join('') : '<li class="empty">Nothing here yet.</li>';
+  setToggle('listToggle', shown.length, TX_LIMIT, showAllTx);
   var recs = [];
   state.incomes.forEach(function(x){ if(x.recurring) recs.push({t:'Income', label:(x.source||'Income'), amount:x.amount, date:x.date}); });
   state.expenses.forEach(function(x){ if(x.recurring){ var c=catOf(x.cat); recs.push({t:'Expense', label:(c.label+(x.sub?' - '+x.sub:'')), amount:x.amount, date:x.date}); } });
-  $('recList').innerHTML = recs.length ? recs.map(function(r){ return '<li class="item"><div class="ico">🔁</div><div class="meta"><b>'+esc(r.label)+'</b><small>'+r.t+' · last '+fmtDate(r.date)+'</small></div><span class="amt">'+inr(r.amount)+'/mo</span></li>'; }).join('') : '<li class="empty">No recurring items yet.</li>';
+  var visRec = showAllRec ? recs : recs.slice(0, REC_LIMIT);
+  $('recList').innerHTML = recs.length ? visRec.map(function(r){ return '<li class="item"><div class="ico">🔁</div><div class="meta"><b>'+esc(r.label)+'</b><small>'+r.t+' · last '+fmtDate(r.date)+'</small></div><span class="amt">'+inr(r.amount)+'/mo</span></li>'; }).join('') : '<li class="empty">No recurring items yet.</li>';
+  setToggle('recToggle', recs.length, REC_LIMIT, showAllRec);
   renderBudgets(monthSpentByCat);
-  $('notesList').innerHTML = state.notes.length ? state.notes.map(function(n){
+  var nc = $('notesCount'); if(nc) nc.textContent = state.notes.length ? '('+state.notes.length+')' : '';
+  var visNotes = showAllNotes ? state.notes : state.notes.slice(0, NOTES_LIMIT);
+  $('notesList').innerHTML = state.notes.length ? visNotes.map(function(n){
     return '<li class="item note-card"><div class="ico">📝</div><div class="meta"><b>'+(esc(n.title)||'Untitled')+'</b><p>'+esc(n.content)+'</p><small>'+fmtDate(n.date)+'</small></div><div><button class="mini" onclick="editNote('+n.id+')">Edit</button><button class="mini danger" onclick="removeNote('+n.id+')">Delete</button></div></li>';
   }).join('') : '<li class="empty">No notes yet. Your notes stay separate from money.</li>';
+  setToggle('notesToggle', state.notes.length, NOTES_LIMIT, showAllNotes);
 }
 $('resetBtn').onclick = function(){ if(confirm('Delete all data and start over?')){ try{localStorage.removeItem(KEY);}catch(e){} state=null; editingNoteId=null; showSetup(false); } };
 $('exportBtn').onclick = exportCSV;
 $('importBtn').onclick = pickFile;
 $('importBtn2').onclick = pickFile;
 $('csvFile').onchange = function(e){ if(e.target.files[0]) importCSV(e.target.files[0]); e.target.value=''; };
+/* Offline notifications engine — 100% on-device, no internet. */
+function notifyPrefs(){ if(!state) return {enabled:true, daily:true, time:'21:00', budget:true, balance:true, lowBalance:500, recurring:true, fired:{}}; if(!state.notify) state.notify = {enabled:true, daily:true, time:'21:00', budget:true, balance:true, lowBalance:500, recurring:true, fired:{}}; return state.notify; }
+function notifyOn(){ if(!state) return false; var p = notifyPrefs(); return !!(p && p.enabled); }
+function fireLocal(id, title, body){
+  if(!notifyOn()) return;
+  try { if(window.PLNotify && window.PLNotify.instant) { window.PLNotify.instant(id, title, body); } } catch(e){}
+}
+function balanceNow(){
+  var income = state.incomes.reduce(function(s,x){ return s+x.amount; }, 0);
+  var spent = state.expenses.reduce(function(s,x){ return s+x.amount; }, 0);
+  return (state.start + income) - spent;
+}
+function hashStr(s){ var h=0; s=String(s||''); for(var i=0;i<s.length;i++){ h=((h<<5)-h+s.charCodeAt(i))|0; } return h; }
+function scheduleDailyReminder(){
+  try {
+    if(!state || !notifyOn()) return;
+    var p = notifyPrefs();
+    if(!p.daily) { if(window.PLNotify) window.PLNotify.cancel([9301]); return; }
+    var parts = String(p.time||'21:00').split(':');
+    var h = Math.max(0, Math.min(23, Number(parts[0])||21));
+    var m = Math.max(0, Math.min(59, Number(parts[1])||0));
+    if(window.PLNotify && window.PLNotify.scheduleDaily){
+      window.PLNotify.scheduleDaily(9301, "Log today's expenses", 'Pocket Ledger daily reminder - 1 min to stay on track.', h, m);
+    }
+  } catch(e){}
+}
+function checkAlerts(kind, catId){
+  try {
+    if(!state || !notifyOn()) return;
+    var p = notifyPrefs();
+    if(!p.fired || typeof p.fired!=='object') p.fired = {};
+    var mk = todayStr().slice(0,7);
+    var ms = {};
+    state.expenses.forEach(function(x){ if(monthKey(x.date)===mk) ms[x.cat]=(ms[x.cat]||0)+x.amount; });
+    if(p.budget){
+      var cats = (kind==='budget' && catId) ? [catId] : Object.keys(state.budgets||{});
+      cats.forEach(function(k){
+        var limit = Number(state.budgets[k])||0; if(!(limit>0)) return;
+        var spent = Number(ms[k])||0;
+        var c = catOf(k);
+        var key100 = 'b100:'+mk+':'+k, key80 = 'b80:'+mk+':'+k;
+        if(spent > limit && !p.fired[key100]){
+          p.fired[key100]=1; save();
+          fireLocal(1000+Math.abs(hashStr(k))%8000, 'Over budget: '+c.label, c.icon+' '+inr(spent)+' of '+inr(limit)+' spent this month.');
+        } else if(spent >= limit*0.8 && spent <= limit && !p.fired[key80]){
+          p.fired[key80]=1; save();
+          fireLocal(2000+Math.abs(hashStr(k))%8000, 'Near budget limit: '+c.label, c.icon+' '+inr(spent)+' of '+inr(limit)+' ('+Math.round(spent/limit*100)+'%).');
+        }
+      });
+    }
+    if(p.balance && (kind==='expense' || kind==='budget' || kind==='income')){
+      var bal = balanceNow();
+      var th = Number(p.lowBalance); if(!(th>=0)) th = 0;
+      var keyB = 'low:'+mk+':'+String(th);
+      if(bal < th && !p.fired[keyB]){
+        p.fired[keyB]=1; save();
+        fireLocal(9101, 'Low balance: '+inr(bal), bal<0 ? 'You have spent more than you have.' : 'Balance dropped below '+inr(th)+'.');
+      }
+      if(bal < 0 && !p.fired['neg:'+mk]){
+        p.fired['neg:'+mk]=1; save();
+        fireLocal(9102, 'Balance negative', 'You have spent more than you have ('+inr(bal)+').');
+      }
+    }
+    checkRecurring(true);
+    scheduleDailyReminder();
+  } catch(e){}
+}
+function checkRecurring(onlyIfEnabled){
+  try {
+    if(!state || !notifyOn()) return;
+    var p = notifyPrefs();
+    if(onlyIfEnabled && !p.recurring) return;
+    if(!p.fired || typeof p.fired!=='object') p.fired = {};
+    var today = todayStr();
+    if(p.fired['rec:'+today]) return;
+    var recs = [];
+    state.incomes.forEach(function(x){ if(x.recurring) recs.push({t:'Income', label:(x.source||'Income'), amount:x.amount, date:x.date}); });
+    state.expenses.forEach(function(x){ if(x.recurring){ var c=catOf(x.cat); recs.push({t:'Expense', label:(c.label+(x.sub?' - '+x.sub:'')), amount:x.amount, date:x.date}); } });
+    if(!recs.length) return;
+    var day = Number(today.slice(8,10))||1;
+    var due = recs.filter(function(r){
+      var d = Number(String(r.date||'').slice(8,10))||0;
+      if(!d) return false;
+      var diff = d - day;
+      return diff >= 0 && diff <= 2;
+    });
+    if(due.length){
+      p.fired['rec:'+today]=1; save();
+      var first = due[0];
+      if(due.length===1) fireLocal(9201, 'Recurring due: '+first.label, first.t+' '+inr(first.amount)+' expected around day '+first.date.slice(8,10)+'.');
+      else fireLocal(9201, due.length+' recurring payments due soon', first.label+' '+inr(first.amount)+' + '+(due.length-1)+' more in next 2 days.');
+    }
+  } catch(e){}
+}
+function refreshNotifUI(){
+  try {
+    var p = notifyPrefs();
+    if($('notifEnable')) $('notifEnable').checked = p.enabled !== false;
+    if($('notifDaily')) $('notifDaily').checked = p.daily !== false;
+    if($('notifTime')) $('notifTime').value = p.time || '21:00';
+    if($('notifBudget')) $('notifBudget').checked = p.budget !== false;
+    if($('notifBalance')) $('notifBalance').checked = p.balance !== false;
+    if($('notifLow')) $('notifLow').value = (p.lowBalance==null?'':p.lowBalance);
+    if($('notifRecurring')) $('notifRecurring').checked = p.recurring !== false;
+    updateNotifState('Settings loaded.');
+  } catch(e){}
+}
+function updateNotifState(msg){
+  try {
+    var el = $('notifState'); if(!el) return;
+    var native = (window.PLNotify && window.PLNotify.isNative && window.PLNotify.isNative());
+    var perm = 'n/a';
+    try { if(window.PLNotify && window.PLNotify.canWebNotify && window.PLNotify.canWebNotify()) perm = Notification.permission; } catch(e){}
+    el.textContent = (native ? 'Mode: Android offline (works app-closed). ' : 'Mode: Web alerts (open app; install Android APK for closed-app reminders). ') + (msg||'') + (perm!=='n/a' ? ' Browser: '+perm+'.' : '');
+  } catch(e){}
+}
+var notifBound = false;
+function bindNotifUIOnce(){ if(notifBound) return; notifBound = true; bindNotifUI(); }
+function bindNotifUI(){
+  try {
+    if(!$('notifEnable')) return;
+    var ids = ['notifEnable','notifDaily','notifTime','notifBudget','notifBalance','notifLow','notifRecurring'];
+    var onChange = function(){
+      var p = notifyPrefs();
+      p.enabled = !!$('notifEnable').checked;
+      p.daily = !!$('notifDaily').checked;
+      p.time = ($('notifTime').value||'21:00');
+      p.budget = !!$('notifBudget').checked;
+      p.balance = !!$('notifBalance').checked;
+      var lv = parseFloat($('notifLow').value);
+      p.lowBalance = isNaN(lv) ? 0 : Math.max(0, lv);
+      p.recurring = !!$('notifRecurring').checked;
+      save();
+      if(!p.enabled){ if(window.PLNotify) window.PLNotify.cancel([9301]); updateNotifState('Notifications off.'); toast('Notifications off'); return; }
+      scheduleDailyReminder();
+      updateNotifState('Saved. Daily at '+p.time+'.');
+      toast('Notification settings saved');
+    };
+    ids.forEach(function(id){ var el = $(id); if(el) el.addEventListener('change', onChange); });
+    if($('notifPermBtn')) $('notifPermBtn').onclick = function(){
+      if(!window.PLNotify) return;
+      Promise.resolve(window.PLNotify.requestPermission()).then(function(ok){
+        if(ok){ updateNotifState('Permission granted. Offline alerts on.'); toast('Notifications enabled'); scheduleDailyReminder(); }
+        else {
+          var prot = location.protocol;
+          var hint = (prot === 'file:')
+            ? 'Browser blocks notifications on file://. Run via localhost (VS Code Live Server: right-click index.html > Open with Live Server) then Allow.'
+            : 'Blocked. Click the lock/tune icon in the address bar > Notifications > Allow, then tap Enable again.';
+          updateNotifState('Blocked. ' + hint); toast('Permission blocked — see note below');
+        }
+      });
+    };
+    if($('notifTestBtn')) $('notifTestBtn').onclick = function(){
+      if(!$('notifEnable').checked){ toast('Turn on Enable notifications first'); return; }
+      if(!window.PLNotify) return;
+      var prot = location.protocol;
+      Promise.resolve(window.PLNotify.instant(9999, 'Pocket Ledger test', 'Offline alerts work. No internet needed.')).then(function(r){
+        if(r === 'web' || r === 'web-sw' || r === 'native'){ toast('Test notification sent'); updateNotifState('Test sent (' + r + '). Check your notification tray.'); }
+        else if(String(r||'').indexOf('need-permission') === 0){ toast('Tap Enable notifications first, then Allow'); updateNotifState('Tap Enable notifications above and choose Allow in the browser prompt.'); }
+        else if(r === 'denied'){ updateNotifState('Blocked. Click the lock icon in the address bar > Notifications > Allow, then reload.'); toast('Blocked — allow in address bar'); }
+        else if(r === 'no-api'){ updateNotifState('This browser/file mode has no Notification API. Use Chrome via localhost or the Android APK.'); toast('No notification API here'); }
+        else { toast('System blocked it — showing in-app instead'); updateNotifState('System response: ' + r + (prot === 'file:' ? ' If file://, use Live Server (localhost) instead.' : ' Check site notification permission.')); }
+      });
+    };
+  } catch(e){}
+}
 buildCatPicker();
+/* Add Expense / Income tabs — expense open by default */
+function switchAddTab(which){
+  var isExp = (which !== 'inc');
+  var te = $('tabExp'), ti = $('tabInc'), ev = $('expView'), iv = $('incView');
+  if(te){ te.classList.toggle('active', isExp); te.setAttribute('aria-selected', String(isExp)); }
+  if(ti){ ti.classList.toggle('active', !isExp); ti.setAttribute('aria-selected', String(!isExp)); }
+  if(ev) ev.classList.toggle('hidden', !isExp);
+  if(iv) iv.classList.toggle('hidden', isExp);
+}
+if($('tabExp')) $('tabExp').onclick = function(){ switchAddTab('exp'); };
+if($('tabInc')) $('tabInc').onclick = function(){ switchAddTab('inc'); };
+switchAddTab('exp');
 $('filter').innerHTML = '<option value="all">All categories</option><option value="income">Income only</option>' + CATEGORIES.map(function(c){ return '<option value="'+c.id+'">'+c.label+'</option>'; }).join('');
-$('filter').onchange = render;
-$('monthFilter').onchange = render;
-$('search').oninput = render;
+$('filter').onchange = function(){ showAllTx=false; render(); };
+$('monthFilter').onchange = function(){ showAllTx=false; render(); };
+$('search').oninput = function(){ showAllTx=false; render(); };
+/* Collapsible toggles — keep home short */
+function wireToggle(id, fn, noRender){
+  var b = $(id); if(!b) return;
+  b.onclick = function(e){ if(e) e.stopPropagation(); fn(); if(!noRender) render(); };
+}
+wireToggle('listToggle', function(){ showAllTx = !showAllTx; });
+wireToggle('notesToggle', function(){ showAllNotes = !showAllNotes; });
+wireToggle('recToggle', function(){ showAllRec = !showAllRec; });
+wireToggle('budgetToggle', function(){ showAllBudgets = !showAllBudgets; });
+function setCollapsed(bodyId, btnId, headId, collapsed){
+  var body = $(bodyId), btn = $(btnId), head = $(headId);
+  if(body) body.classList.toggle('hidden', collapsed);
+  if(btn) btn.textContent = collapsed ? 'Show' : 'Hide';
+  if(btn) btn.setAttribute('aria-expanded', String(!collapsed));
+  if(head) head.setAttribute('aria-expanded', String(!collapsed));
+}
+wireToggle('budgetHeadToggle', function(){
+  var b = $('budgetBody'); var willHide = b ? !b.classList.contains('hidden') : true;
+  setCollapsed('budgetBody','budgetHeadToggle',null,willHide);
+}, true);
+wireToggle('recHeadToggle', function(){
+  var b = $('recBody'); var willHide = b ? !b.classList.contains('hidden') : true;
+  setCollapsed('recBody','recHeadToggle',null,willHide);
+}, true);
+function toggleNotif(force){
+  var body = $('notifBody'); if(!body) return;
+  var isHidden = body.classList.contains('hidden');
+  var show = (typeof force==='boolean') ? force : isHidden;
+  setCollapsed('notifBody','notifToggle','notifHead',!show);
+}
+if($('notifToggle')) $('notifToggle').onclick = function(e){ if(e) e.stopPropagation(); toggleNotif(); };
+if($('notifHead')){
+  $('notifHead').onclick = function(){ toggleNotif(); };
+  $('notifHead').onkeydown = function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleNotif(); } };
+}
 $('budgetCat').innerHTML = CATEGORIES.map(function(c){ return '<option value="'+c.id+'">'+c.label+'</option>'; }).join('');
 try{ $('date').value = todayStr(); $('incDate').value = todayStr(); }catch(e){}
 render();

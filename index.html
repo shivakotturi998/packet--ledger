@@ -62,52 +62,58 @@
     <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
   </section>
   <div class="grid">
-    <section class="panel">
-      <h2>Add an expense</h2>
-      <form id="expForm" autocomplete="off">
-        <div class="cats" id="catPicker" role="radiogroup" aria-label="Category"></div>
-        <label id="subWrap" class="hidden">Subcategory
-          <select id="subSelect"></select>
-        </label>
-        <label>Amount (₹)
-          <input id="amount" type="number" min="0.01" step="any" required placeholder="0">
-        </label>
-        <label>Note <span class="opt">(optional)</span>
-          <input id="note" type="text" maxlength="60" placeholder="e.g. Dinner">
-        </label>
-        <label>Date
-          <input id="date" type="date" required>
-        </label>
-        <label class="check"><input id="expRecurring" type="checkbox"> Monthly recurring</label>
-        <button class="btn primary" type="submit">Add expense</button>
-        <p id="formErr" class="err"></p>
-      </form>
-    </section>
-    <section class="panel">
-      <h2>Add income</h2>
-      <form id="incForm" autocomplete="off">
-        <label>Amount (₹)
-          <input id="incAmount" type="number" min="0.01" step="any" required placeholder="0">
-        </label>
-        <label>Source
-          <input id="incSource" type="text" maxlength="40" placeholder="e.g. Salary, Freelance">
-        </label>
-        <label>Note <span class="opt">(optional)</span>
-          <input id="incNote" type="text" maxlength="60" placeholder="e.g. August salary">
-        </label>
-        <label>Date
-          <input id="incDate" type="date" required>
-        </label>
-        <label class="check"><input id="incRecurring" type="checkbox"> Monthly recurring</label>
-        <button class="btn primary" type="submit">Add income</button>
-        <p id="incErr" class="err"></p>
-      </form>
-      <h2 class="mt">Where it went</h2>
-      <div id="breakdown" class="breakdown"></div>
+    <section class="panel wide" id="addPanel">
+      <div class="tabs" role="tablist" aria-label="Add transaction">
+        <button id="tabExp" class="tab active" type="button" role="tab" aria-selected="true"><span class="tab-ico">💸</span> Expense</button>
+        <button id="tabInc" class="tab" type="button" role="tab" aria-selected="false"><span class="tab-ico">💰</span> Income</button>
+      </div>
+      <div id="expView" role="tabpanel" aria-label="Add expense">
+        <form id="expForm" autocomplete="off">
+          <div class="cats" id="catPicker" role="radiogroup" aria-label="Category"></div>
+          <label id="subWrap" class="hidden">Subcategory
+            <select id="subSelect"></select>
+          </label>
+          <label>Amount (₹)
+            <input id="amount" type="number" min="0.01" step="any" required placeholder="0">
+          </label>
+          <label>Note <span class="opt">(optional)</span>
+            <input id="note" type="text" maxlength="60" placeholder="e.g. Dinner">
+          </label>
+          <label>Date
+            <input id="date" type="date" required>
+          </label>
+          <label class="check"><input id="expRecurring" type="checkbox"> Monthly recurring</label>
+          <button class="btn primary" type="submit">Add expense</button>
+          <p id="formErr" class="err"></p>
+        </form>
+      </div>
+      <div id="incView" class="hidden" role="tabpanel" aria-label="Add income">
+        <form id="incForm" autocomplete="off">
+          <label>Amount (₹)
+            <input id="incAmount" type="number" min="0.01" step="any" required placeholder="0">
+          </label>
+          <label>Source
+            <input id="incSource" type="text" maxlength="40" placeholder="e.g. Salary, Freelance">
+          </label>
+          <label>Note <span class="opt">(optional)</span>
+            <input id="incNote" type="text" maxlength="60" placeholder="e.g. August salary">
+          </label>
+          <label>Date
+            <input id="incDate" type="date" required>
+          </label>
+          <label class="check"><input id="incRecurring" type="checkbox"> Monthly recurring</label>
+          <button class="btn primary" type="submit">Add income</button>
+          <p id="incErr" class="err"></p>
+        </form>
+      </div>
     </section>
     <section class="panel wide">
+      <h2>Where it went</h2>
+      <div id="breakdown" class="breakdown"></div>
+    </section>
+    <section class="panel wide" id="txPanel">
       <div class="list-head">
-        <h2>Transactions</h2>
+        <h2>Transactions <span id="txCount" class="count"></span></h2>
         <div class="filters">
           <input id="search" type="text" placeholder="Search..." aria-label="Search transactions">
           <select id="monthFilter" aria-label="Filter by month"></select>
@@ -115,33 +121,71 @@
         </div>
       </div>
       <ul id="list" class="list"></ul>
+      <button id="listToggle" class="btn outline sm hidden" type="button">Show all</button>
     </section>
     <section class="panel">
-      <h2>Monthly budgets</h2>
-      <p class="hint">Optional. Warns at 80 percent and 100 percent of each category.</p>
-      <form id="budgetForm" autocomplete="off">
-        <div class="budget-row">
-          <select id="budgetCat" aria-label="Budget category"></select>
-          <input id="budgetAmt" type="number" min="1" step="any" placeholder="₹ amount" aria-label="Budget amount">
-          <button class="btn primary" type="submit">Save</button>
+      <div class="panel-head">
+        <h2>Monthly budgets</h2>
+        <button id="budgetHeadToggle" class="mini" type="button" aria-expanded="true">Hide</button>
+      </div>
+      <div id="budgetBody">
+        <p class="hint">Optional. Warns at 80 percent and 100 percent of each category.</p>
+        <form id="budgetForm" autocomplete="off">
+          <div class="budget-row">
+            <select id="budgetCat" aria-label="Budget category"></select>
+            <input id="budgetAmt" type="number" min="1" step="any" placeholder="₹ amount" aria-label="Budget amount">
+            <button class="btn primary" type="submit">Save</button>
+          </div>
+          <p id="budgetErr" class="err"></p>
+        </form>
+        <div id="budgets" class="budgets"></div>
+        <button id="budgetToggle" class="btn outline sm hidden" type="button">Show all</button>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Recurring payments</h2>
+        <button id="recHeadToggle" class="mini" type="button" aria-expanded="true">Hide</button>
+      </div>
+      <div id="recBody">
+        <p class="hint">Tick Monthly recurring when adding income or an expense. Offline reminders fire on your Android app when notifications are on.</p>
+        <ul id="recList" class="list"></ul>
+        <button id="recToggle" class="btn outline sm hidden" type="button">Show all</button>
+      </div>
+    </section>
+    <section class="panel" id="notifPanel">
+      <div class="panel-head clickable" id="notifHead" role="button" tabindex="0" aria-expanded="false">
+        <h2>🔔 Notifications &amp; alerts</h2>
+        <button id="notifToggle" class="mini" type="button">Show</button>
+      </div>
+      <div id="notifBody" class="collapsible hidden">
+        <p class="hint">100% offline. Scheduled on this device — no internet or account needed. On Android APK they fire even when the app is closed. On web they appear while the app is open.</p>
+        <label class="check"><input id="notifEnable" type="checkbox"> Enable notifications</label>
+        <label class="check"><input id="notifDaily" type="checkbox"> Daily reminder to log expenses</label>
+        <label>Reminder time
+          <input id="notifTime" type="time" value="21:00">
+        </label>
+        <label class="check"><input id="notifBudget" type="checkbox"> Budget warnings (80% and 100%)</label>
+        <label class="check"><input id="notifBalance" type="checkbox"> Low balance alert</label>
+        <label>Warn me when balance drops below (₹)
+          <input id="notifLow" type="number" min="0" step="any" placeholder="e.g. 500">
+        </label>
+        <label class="check"><input id="notifRecurring" type="checkbox"> Recurring payment reminders</label>
+        <div class="note-actions">
+          <button class="btn primary" type="button" id="notifPermBtn">Enable notifications</button>
+          <button class="btn ghost" type="button" id="notifTestBtn">Send test</button>
         </div>
-        <p id="budgetErr" class="err"></p>
-      </form>
-      <div id="budgets" class="budgets"></div>
-    </section>
-    <section class="panel">
-      <h2>Recurring payments</h2>
-      <p class="hint">Tick Monthly recurring when adding income or an expense. Tracked in the app. Reminders depend on platform support.</p>
-      <ul id="recList" class="list"></ul>
+        <p id="notifState" class="hint" style="margin-top:.6rem"></p>
+      </div>
     </section>
     <section class="panel wide">
       <div class="list-head">
-        <h2>Notes</h2>
+        <h2>Notes <span id="notesCount" class="count"></span></h2>
         <span class="hint">Separate from money.</span>
       </div>
       <form id="noteForm" autocomplete="off">
         <input id="noteTitle" type="text" maxlength="60" placeholder="Note title" aria-label="Note title">
-        <textarea id="noteContent" rows="3" maxlength="1000" placeholder="Write something..." aria-label="Note content"></textarea>
+        <textarea id="noteContent" rows="2" maxlength="1000" placeholder="Write something..." aria-label="Note content"></textarea>
         <div class="note-actions">
           <button class="btn primary" type="submit" id="noteSave">Add note</button>
           <button class="btn ghost hidden" type="button" id="noteCancel">Cancel edit</button>
@@ -149,12 +193,14 @@
         <p id="noteErr" class="err"></p>
       </form>
       <ul id="notesList" class="list"></ul>
+      <button id="notesToggle" class="btn outline sm hidden" type="button">Show all</button>
     </section>
   </div>
 </main>
 <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
 <div id="offlineBadge" class="offline-badge" hidden>Offline — changes saved on this device</div>
 <div id="toast" class="toast" role="status"></div>
+<script src="notify.js"></script>
 <script src="script.js"></script>
 <script>
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {

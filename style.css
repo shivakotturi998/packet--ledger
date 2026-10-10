@@ -151,4 +151,31 @@ body.dark .budget.over{background:#2B1414}
 .mini{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:.85rem;font-weight:700;padding:.4rem .5rem;border-radius:8px}
 .mini:hover{background:var(--line);color:var(--ink)}
 .mini.danger:hover{background:#FBE9E9;color:#C43D3D}
+/* Collapsible / compact home */
+.count{color:var(--muted);font-weight:500;font-size:.95rem}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:.8rem;margin-bottom:1rem}
+.panel-head h2{margin:0;font-size:1.15rem}
+.panel-head.clickable{cursor:pointer;border-radius:12px;padding:.2rem .2rem}
+.panel-head.clickable:hover h2{color:var(--brand)}
+.collapsible{overflow:hidden}
+.collapsible.hidden{display:none!important}
+.btn.sm{width:auto;padding:.6rem 1rem;font-size:.9rem;margin-top:.8rem}
+#listToggle,#notesToggle,#recToggle,#budgetToggle{width:100%}
+/* Add Expense / Income tabs - big + colorful */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:1rem;background:transparent;padding:0;border-radius:20px;margin-bottom:1.4rem}
+.tab{border:3px solid transparent;padding:1.6rem .6rem;min-height:110px;border-radius:20px;font-weight:800;font-size:1.6rem;cursor:pointer;background:var(--bg);transition:all .18s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem}
+.tab-ico{font-size:2.6rem;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
+#tabExp{color:#C43D3D;background:#FDECEC;border-color:#F5C6C6}
+#tabExp:hover{background:#FADCDC}
+#tabExp.active{background:#C43D3D;border-color:#C43D3D;color:#fff;box-shadow:0 12px 28px -8px rgba(196,61,61,.65);transform:scale(1.02)}
+#tabInc{color:#12805C;background:#E3F5EB;border-color:#B9E3CB}
+#tabInc:hover{background:#D3EFE0}
+#tabInc.active{background:#12805C;border-color:#12805C;color:#fff;box-shadow:0 12px 28px -8px rgba(18,128,92,.65);transform:scale(1.02)}
+.tab:active{transform:scale(.97)}
+@media (max-width:480px){.tab{min-height:96px;font-size:1.35rem}.tab-ico{font-size:2.2rem}}
+body.dark #tabExp{background:#2B1414;border-color:#5A2626;color:#FF9B9B}
+body.dark #tabExp.active{background:#C43D3D;border-color:#C43D3D;color:#fff}
+body.dark #tabInc{background:#0F2A20;border-color:#1E5B41;color:#6FD3A6}
+body.dark #tabInc.active{background:#12805C;border-color:#12805C;color:#fff}
+#addPanel form{max-width:520px}
 @media (max-width:760px){.budget-row{grid-template-columns:1fr}.filters input{width:100%}.filters{width:100%}.list-head{flex-direction:column;align-items:flex-start}}

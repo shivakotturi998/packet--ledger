@@ -1,10 +1,11 @@
 /* Pocket Ledger service worker — cache-first offline support */
-const CACHE = 'pocket-ledger-v4';
+const CACHE = 'pocket-ledger-v6';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './script.js',
+  './notify.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -27,6 +28,16 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow('./index.html');
+    })
+  );
 });
 
 self.addEventListener('fetch', (e) => {
