@@ -1,7 +1,7 @@
 {
   "name": "Pocket Ledger – Expense Tracker",
   "short_name": "Pocket Ledger",
-  "description": "Simple offline expense tracker. Track salary, spending and balance.",
+  "description": "Simple offline expense tracker. Track income, spending and balance.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

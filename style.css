@@ -117,3 +117,38 @@ input:focus,select:focus{border-color:var(--brand);outline:none;background:#fff}
   input,select,button{font-size:16px} /* stops iOS auto-zoom on focus */
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Added for subcategories, income, notes, budgets, theme. Old rules above preserved. */
+body.dark{--bg:#11141C;--surface:#1B2030;--ink:#EDEFF7;--muted:#9AA3BC;--line:#2B3247}
+body.dark input,body.dark select,body.dark textarea{background:#121624;border-color:#2B3247;color:var(--ink)}
+body.dark input:focus,body.dark select:focus,body.dark textarea:focus{background:#0F1320;border-color:#8E98F5}
+body.dark .btn.ghost:hover{background:#2B3247;color:#fff}
+textarea{width:100%;margin-top:.4rem;padding:.75rem .9rem;border:1.5px solid var(--line);border-radius:10px;background:#FAFBFD;font:inherit;color:inherit;resize:vertical}
+.mt{margin-top:1.6rem}
+.hint{color:var(--muted);font-size:.88rem;margin:0 0 1rem}
+.check{display:flex;align-items:center;gap:.6rem;font-weight:500}
+.check input{width:auto;margin:0}
+.month-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:1rem 0 .8rem;flex-wrap:wrap}
+.month-summary{font-weight:700;font-size:.95rem}
+.filters{display:flex;gap:.5rem;flex-wrap:wrap}
+.filters input{width:150px;margin:0;padding:.5rem .8rem}
+.filters select{width:auto;margin:0;padding:.5rem .8rem}
+.budget-row{display:grid;grid-template-columns:1fr 1fr auto;gap:.5rem;margin-bottom:1rem}
+.budget-row select,.budget-row input{margin:0}
+.budget-row .btn{width:auto;padding:.75rem 1rem}
+.budgets{display:flex;flex-direction:column;gap:.7rem}
+.budget{border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem;font-size:.9rem}
+.budget.warn{border-color:#E8A100;background:#FFF7DB}
+body.dark .budget.warn{background:#2A230F}
+.budget.over{border-color:#C43D3D;background:#FDECEC}
+body.dark .budget.over{background:#2B1414}
+.budget .b-top{display:flex;justify-content:space-between;font-weight:700;margin-bottom:.3rem}
+.note-actions{display:flex;gap:.5rem}
+.note-actions .btn.primary{width:auto}
+.note-card{align-items:flex-start}
+.note-card .meta b{white-space:normal}
+.note-card p{color:var(--muted);font-size:.9rem;white-space:pre-wrap;margin:.2rem 0}
+.mini{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:.85rem;font-weight:700;padding:.4rem .5rem;border-radius:8px}
+.mini:hover{background:var(--line);color:var(--ink)}
+.mini.danger:hover{background:#FBE9E9;color:#C43D3D}
+@media (max-width:760px){.budget-row{grid-template-columns:1fr}.filters input{width:100%}.filters{width:100%}.list-head{flex-direction:column;align-items:flex-start}}

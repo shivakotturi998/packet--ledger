@@ -1,5 +1,5 @@
 /* Pocket Ledger service worker — cache-first offline support */
-const CACHE = 'pocket-ledger-v2';
+const CACHE = 'pocket-ledger-v4';
 const ASSETS = [
   './',
   './index.html',

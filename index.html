@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pocket Ledger – Expense Tracker</title>
-<meta name="description" content="Pocket Ledger – simple offline expense tracker. Track salary, spending and balance.">
+<meta name="description" content="Pocket Ledger – simple offline expense tracker.">
 <meta name="theme-color" content="#2F3FD0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,17 +20,12 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<!-- Setup screen: shown until starting balance + salary are saved -->
 <section id="setup" class="setup hidden">
   <div class="setup-card">
     <h1>Pocket Ledger</h1>
-    <p class="lead">Tell us where you're starting from. You can change these later.</p>
+    <p class="lead">Tell us where you are starting from. You can change it later. Income is added separately.</p>
     <label>Starting balance (₹)
       <input id="startInput" type="number" min="0" step="any" placeholder="e.g. 15000">
-    </label>
-    <label>Monthly salary (₹)
-      <input id="salaryInput" type="number" min="0" step="any" placeholder="e.g. 40000">
     </label>
     <button id="startBtn" class="btn primary">Start tracking</button>
     <p id="setupErr" class="err"></p>
@@ -38,18 +33,17 @@
     <button id="importBtn2" class="btn outline">Restore from a CSV backup</button>
   </div>
 </section>
-
 <main id="app" class="app hidden">
   <header class="top">
     <h1>Pocket Ledger</h1>
     <div class="top-actions">
+      <button id="themeBtn" class="btn ghost">🌙 Dark</button>
       <button id="exportBtn" class="btn ghost">Export CSV</button>
       <button id="importBtn" class="btn ghost">Import CSV</button>
       <button id="editBtn" class="btn ghost">Edit setup</button>
       <button id="resetBtn" class="btn ghost danger">Reset all</button>
     </div>
   </header>
-
   <section class="balance">
     <div class="balance-main">
       <span class="label">Balance</span>
@@ -58,67 +52,123 @@
     </div>
     <div class="balance-side">
       <div><span class="label">Starting</span><b id="sStart">₹0</b></div>
-      <div><span class="label">Salary received</span><b id="sSalary">₹0</b></div>
+      <div><span class="label">Income received</span><b id="sIncome">₹0</b></div>
       <div><span class="label">Spent</span><b id="sSpent">₹0</b></div>
     </div>
+    <div class="month-row">
+      <span class="label">This month</span>
+      <span id="mSummary" class="month-summary"></span>
+    </div>
     <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
-    <button id="salaryBtn" class="btn light">+ Add this month's salary</button>
   </section>
-
   <div class="grid">
     <section class="panel">
       <h2>Add an expense</h2>
       <form id="expForm" autocomplete="off">
         <div class="cats" id="catPicker" role="radiogroup" aria-label="Category"></div>
+        <label id="subWrap" class="hidden">Subcategory
+          <select id="subSelect"></select>
+        </label>
         <label>Amount (₹)
           <input id="amount" type="number" min="0.01" step="any" required placeholder="0">
         </label>
         <label>Note <span class="opt">(optional)</span>
-          <input id="note" type="text" maxlength="60" placeholder="e.g. Dinner at Paradise">
+          <input id="note" type="text" maxlength="60" placeholder="e.g. Dinner">
         </label>
         <label>Date
           <input id="date" type="date" required>
         </label>
+        <label class="check"><input id="expRecurring" type="checkbox"> Monthly recurring</label>
         <button class="btn primary" type="submit">Add expense</button>
         <p id="formErr" class="err"></p>
       </form>
     </section>
-
     <section class="panel">
-      <h2>Where it went</h2>
+      <h2>Add income</h2>
+      <form id="incForm" autocomplete="off">
+        <label>Amount (₹)
+          <input id="incAmount" type="number" min="0.01" step="any" required placeholder="0">
+        </label>
+        <label>Source
+          <input id="incSource" type="text" maxlength="40" placeholder="e.g. Salary, Freelance">
+        </label>
+        <label>Note <span class="opt">(optional)</span>
+          <input id="incNote" type="text" maxlength="60" placeholder="e.g. August salary">
+        </label>
+        <label>Date
+          <input id="incDate" type="date" required>
+        </label>
+        <label class="check"><input id="incRecurring" type="checkbox"> Monthly recurring</label>
+        <button class="btn primary" type="submit">Add income</button>
+        <p id="incErr" class="err"></p>
+      </form>
+      <h2 class="mt">Where it went</h2>
       <div id="breakdown" class="breakdown"></div>
     </section>
-
     <section class="panel wide">
       <div class="list-head">
         <h2>Transactions</h2>
-        <select id="filter" aria-label="Filter by category"></select>
+        <div class="filters">
+          <input id="search" type="text" placeholder="Search..." aria-label="Search transactions">
+          <select id="monthFilter" aria-label="Filter by month"></select>
+          <select id="filter" aria-label="Filter by category"></select>
+        </div>
       </div>
       <ul id="list" class="list"></ul>
     </section>
+    <section class="panel">
+      <h2>Monthly budgets</h2>
+      <p class="hint">Optional. Warns at 80 percent and 100 percent of each category.</p>
+      <form id="budgetForm" autocomplete="off">
+        <div class="budget-row">
+          <select id="budgetCat" aria-label="Budget category"></select>
+          <input id="budgetAmt" type="number" min="1" step="any" placeholder="₹ amount" aria-label="Budget amount">
+          <button class="btn primary" type="submit">Save</button>
+        </div>
+        <p id="budgetErr" class="err"></p>
+      </form>
+      <div id="budgets" class="budgets"></div>
+    </section>
+    <section class="panel">
+      <h2>Recurring payments</h2>
+      <p class="hint">Tick Monthly recurring when adding income or an expense. Tracked in the app. Reminders depend on platform support.</p>
+      <ul id="recList" class="list"></ul>
+    </section>
+    <section class="panel wide">
+      <div class="list-head">
+        <h2>Notes</h2>
+        <span class="hint">Separate from money.</span>
+      </div>
+      <form id="noteForm" autocomplete="off">
+        <input id="noteTitle" type="text" maxlength="60" placeholder="Note title" aria-label="Note title">
+        <textarea id="noteContent" rows="3" maxlength="1000" placeholder="Write something..." aria-label="Note content"></textarea>
+        <div class="note-actions">
+          <button class="btn primary" type="submit" id="noteSave">Add note</button>
+          <button class="btn ghost hidden" type="button" id="noteCancel">Cancel edit</button>
+        </div>
+        <p id="noteErr" class="err"></p>
+      </form>
+      <ul id="notesList" class="list"></ul>
+    </section>
   </div>
 </main>
-
 <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
 <div id="offlineBadge" class="offline-badge" hidden>Offline — changes saved on this device</div>
 <div id="toast" class="toast" role="status"></div>
 <script src="script.js"></script>
 <script>
-// Register service worker for offline + installable PWA (safe to ignore on file:// or old browsers)
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function() {});
   });
-  // Auto-activate updated SW so new deploys apply without 2nd reload.
   if (navigator.serviceWorker.controller) {
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    navigator.serviceWorker.addEventListener('controllerchange', function() { window.location.reload(); });
   }
 }
-// Offline badge — works on PWA + hosted + Capacitor.
 (function () {
-  const badge = document.getElementById('offlineBadge');
+  var badge = document.getElementById('offlineBadge');
   if (!badge) return;
-  const sync = () => { badge.hidden = navigator.onLine; };
+  var sync = function() { badge.hidden = navigator.onLine; };
   window.addEventListener('online', sync);
   window.addEventListener('offline', sync);
   sync();
